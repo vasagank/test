@@ -44,6 +44,25 @@ async function handleSecureStorageRecovery() {
   }
 }
 
+
+async function apply_pending_launch_action() {
+    const pendingReminderId = localStorage.getItem("pendingReminderId");
+    if (pendingReminderId) {
+        localStorage.removeItem("pendingReminderId");
+        redirect_to(2);
+        await open_reminder_detail(pendingReminderId);
+        return;
+    }
+
+    const pendingDigestTab = localStorage.getItem("pendingDigestTab");
+    if (pendingDigestTab !== null) {
+        const pendingDigestAction = localStorage.getItem("pendingDigestAction");
+        localStorage.removeItem("pendingDigestTab");
+        localStorage.removeItem("pendingDigestAction");
+        redirect_to(parseInt(pendingDigestTab, 10), pendingDigestAction || null);
+    }
+}
+
 async function runVaultMateFlow() {
   const currentPage = document.body.id;
 
@@ -54,37 +73,40 @@ async function runVaultMateFlow() {
   } else if(currentPage === "loginPage") {
     await checkMPINStatus();
   } else if(loggedInPages.includes(currentPage)) {
-    await validateSession(currentPage);
+    const isValidSession = await validateSession(currentPage);
+    if(isValidSession) {
+      setTimeout(async () => {
+        check_app_updates();
+      }, 1200);
 
-    setTimeout(async () => {
-      check_app_updates();
-    }, 1200);
+      await apply_pending_launch_action();
 
-    const pendingReminderId = localStorage.getItem("pendingReminderId");
-    if (pendingReminderId) {
-        localStorage.removeItem("pendingReminderId");
-        setTimeout(async () => {
-            redirect_to(2);
-            await open_reminder_detail(pendingReminderId);
-        }, 800);
-    }   
+      /*const pendingReminderId = localStorage.getItem("pendingReminderId");
+      if (pendingReminderId) {
+          localStorage.removeItem("pendingReminderId");
+          setTimeout(async () => {
+              redirect_to(2);
+              await open_reminder_detail(pendingReminderId);
+          }, 800);
+      }*/ 
     
-    setTimeout(async () => {
-      const isPremium = await isPremiumUser();
-      if(!isPremium && typeof initBilling === "function") {
-        initBilling();
-      }
-    }, 1000);
+      setTimeout(async () => {
+        const isPremium = await isPremiumUser();
+        if(!isPremium && typeof initBilling === "function") {
+          initBilling();
+        }
+      }, 1000);
     
-    //await catchup_reminders();  
-    setTimeout(() => catchup_reminders().catch(console.error), 0);
+      //await catchup_reminders();  
+      setTimeout(() => catchup_reminders().catch(console.error), 0);
 
-    //const shouldRunBackup = sessionActive && loggedInPages.includes(document.body.id);
-    /*setTimeout(() => {
-        check_auto_backup(true).catch(err => {
-            console.error("Auto backup failed:", err);
-        });
-    }, 500);*/
+      //const shouldRunBackup = sessionActive && loggedInPages.includes(document.body.id);
+      /*setTimeout(() => {
+          check_auto_backup(true).catch(err => {
+              console.error("Auto backup failed:", err);
+          });
+      }, 500);*/
+    }
   } 
 
   document.addEventListener("pause", () => {
@@ -251,6 +273,16 @@ async function runVaultMateFlow() {
 
     cordova.plugins.notification.local.on("click", async function (notification) {
       const rm_id = notification.data?.rm_id || notification.id;
+      if(sessionActive) {
+        redirect_to(2);
+        await open_reminder_detail(rm_id);
+      } else {
+        localStorage.setItem("pendingReminderId", rm_id);
+      }
+    });
+
+    /*cordova.plugins.notification.local.on("click", async function (notification) {
+      const rm_id = notification.data?.rm_id || notification.id;
       localStorage.setItem("pendingReminderId", rm_id);
 
       setTimeout(async () => {
@@ -263,7 +295,11 @@ async function runVaultMateFlow() {
           await open_reminder_detail(rm_id);
         }, 500);
       }, 800);
-    });
+    });*/
+
+
+
+
   }
 }
 
@@ -996,12 +1032,13 @@ async function validateSession(currentPage) {
         refresh_dashboard(currentPage);
       }
 
-      return;
+      return true;
     }
     throw new Error("Session expired");
   } catch (err) {
     sessionActive = false;
     window.location.href = "login.html";
+    return false;
   }
 }
 
