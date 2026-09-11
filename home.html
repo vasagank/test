@@ -1,0 +1,493 @@
+<ons-page id="home">
+    <ons-toolbar class="vm-page-toolbar vm-home-toolbar" id="home_toolbar">
+        <div class="left">
+            <a href="javascript:;" class="vm-logo">
+                <span class="logo_text">MahaVault</span>
+            </a>
+        </div>
+        <div class="center vm-search-container" id="vmSearch">
+            <input type="text" class="vm-search-input" enterkeyhint="search" placeholder="Search vaults..."/>
+            <button class="vm-search-apply" id="vmSearchApply">
+                <i class="fa fa-search"></i>
+            </button>
+        </div>
+        <div class="right vm-header-actions">
+            <button class="vm-search-toggle" id="vmSearchToggle">
+                <i class="fa fa-search"></i>
+            </button>
+            <button class="vm-theme-toggle hide d-none" id="vmThemeToggle">
+                <i class="fa fa-moon" id="vmThemeIcon"></i>
+            </button>
+            <button class="vm-settings-toggle" onclick="open_overlay('settings_wrapper.html')">
+                <i class="fa fa-cog"></i>
+            </button>
+        </div>
+    </ons-toolbar>
+
+    <ons-pull-hook id="dashboard-pull-hook" height="100px" threshold-height="300px">
+        <div class="pull-indicator" id="pull_indicator">
+            <div class="pull-indicator-icon">
+                <i class="fa fa-arrow-down" id="pull_arrow"></i>
+            </div>
+            <span id="pull_label">Pull to refresh</span>
+        </div>
+        <ons-progress-circular indeterminate class="home_pull_refresh" id="pull_spinner"></ons-progress-circular>
+    </ons-pull-hook>
+
+    <!-- <ons-pull-hook id="dashboard-pull-hook">
+        <ons-progress-circular indeterminate class="home_pull_refresh hide"></ons-progress-circular>
+    </ons-pull-hook> -->
+    
+    <div class="dashboard">
+        <div class="section-title">
+            <span>Overview</span>
+        </div>
+        <div class="rem-card-grid">
+            <div class="vm_dashboard_card vm_dashboard_card_primary" onclick="redirect_to(1)">
+                <div class="vm_dashboard_card_icon_container">
+                    <i class="fa fa-shield vm_dashboard_card_icon"></i>
+                </div>
+                <div class="vm_dashboard_card_content">
+                    <div class="vm_dashboard_card_title">Vaults</div>
+                    <div class="vm_dashboard_card_value" id="vm_total_vaults">0</div>
+                </div>
+            </div>
+            <div class="vm_dashboard_card vm_dashboard_card_purple" onclick="redirect_to(2)">
+                <div class="vm_dashboard_card_icon_container">
+                    <i class="far fa-bell vm_dashboard_card_icon"></i>
+                </div>
+                <div class="vm_dashboard_card_content">
+                    <div class="vm_dashboard_card_title">Reminders</div>
+                    <div class="vm_dashboard_card_value" id="vm_total_reminders">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="vm_promo_slider" class="vm_promo_slider">
+            <div class="section-title">
+                <span>Get Started</span>
+            </div>
+            <div class="vm_promo_track" id="vm_promo_track">
+                <div class="vm_promo_slide vm_promo_import" onclick="import_csv()" id="vm_import_card">
+                    <div class="vm_promo_card_top">
+                        <div class="vm_promo_icon">
+                            <i class="fas fa-file-import"></i>
+                        </div>
+                        <div class="vm_promo_text">
+                            <div class="vm_promo_title">Import your passwords</div>
+                            <div class="vm_promo_desc">Import passwords from Chrome securely. No manual entry needed</div>
+                        </div>
+                    </div>
+                    <div class="vm_promo_action">Import</div>
+                </div>
+                <div class="vm_promo_slide vm_promo_upgrade vm_promo_vault" id="vm_upgrade_card" onclick="open_upgrade()">
+                    <div class="vm_promo_card_top">
+                        <div class="vm_promo_icon">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <div class="vm_promo_text">
+                            <div class="vm_promo_title">Vault limit reached</div>
+                            <div class="vm_promo_desc">Add more vaults without limits</div>
+                        </div>
+                    </div>
+                    <div class="vm_promo_action">Upgrade</div>
+                </div>
+                <div class="vm_promo_slide vm_promo_upgrade vm_promo_reminder" id="vm_reminder_card" onclick="open_upgrade()">
+                    <div class="vm_promo_card_top">
+                        <div class="vm_promo_icon">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                        <div class="vm_promo_text">
+                            <div class="vm_promo_title">Smart reminders</div>
+                            <div class="vm_promo_desc">Never miss bills & renewals</div>
+                        </div>
+                    </div>
+                    <div class="vm_promo_action">Unlock</div>
+                </div>
+            </div>
+            <div class="vm_promo_dots" id="vm_promo_dots"></div>
+        </div>
+
+        <div class="section-title">
+            <span>Security Insights</span>
+        </div>
+
+        <div class="items-container vm_si_card">
+            <div class="vm_si_header">
+                <div id="vm_si_score" class="vm_si_score">0%</div>
+                <div class="vm_si_meta">
+                    <div class="vm_si_label">Security Score</div>
+                    <div id="vm_si_status" class="vm_si_status"></div>
+                </div>
+            </div>
+          <div id="vm_si_summary" class="vm_si_summary_strip"></div>
+          <div id="vm_si_worst"></div>
+          <div id="vm_si_list"></div>
+        </div>
+
+        
+        <div class="section-title">
+          <span>Blast Radius</span>
+        </div>
+
+        <div data-loader="dashboard.blast_radius" class="dashboard-loader hide items-container">
+          <ons-progress-circular indeterminate class="dashboard-spinner"></ons-progress-circular>
+        </div>
+
+        <div id="vm_blast_empty" data-empty="dashboard.blast_radius" class="items-container"></div>
+
+        <div id="vm_blast_container" data-item="dashboard.blast_radius" class="items-container"></div>
+
+
+
+        <div class="section-title">
+            <span>Password Health</span>
+        </div>
+        <div data-loader="dashboard.password_health" class="dashboard-loader hide items-container">
+            <ons-progress-circular indeterminate class="dashboard-spinner"></ons-progress-circular>
+        </div>
+        <div id="vm_ph_new_empty" class="items-container" data-empty="dashboard.password_health"></div>
+        <div id="vm_ph_new" class="vm_ph_card" data-item="dashboard.password_health">
+            <div class="vm_ph_header">
+                <div>
+                    <div class="vm_ph_title">Security Overview</div>
+                    <div id="ph_sub" class="vm_ph_sub">Your password strength</div>
+                </div>
+                <div id="ph_score" class="vm_ph_score">0%</div>
+            </div>
+            <div class="vm_ph_bar">
+                <div id="ph_bar" class="vm_ph_fill"></div>
+            </div>
+            <div id="ph_insight" class="vm_ph_insight"></div>
+            <div class="vm_ph_stats">
+                <div class="vm_ph_stat" onclick="redirect_to(1, 'weakPassword|1')">
+                    <div id="ph_weak" class="vm_ph_num weak">0</div>
+                    <div class="vm_ph_label">Weak</div>
+                </div>
+                <div class="vm_ph_stat" onclick="redirect_to(1, 'weakPassword|2')">
+                    <div id="ph_medium" class="vm_ph_num medium">0</div>
+                    <div class="vm_ph_label">Medium</div>
+                </div>
+                <div class="vm_ph_stat" onclick="redirect_to(1, 'weakPassword|3')">
+                    <div id="ph_strong" class="vm_ph_num strong">0</div>
+                    <div class="vm_ph_label">Strong</div>
+                </div>
+            </div>
+            <div id="ph_action" class="vm_ph_action"></div>
+        </div>
+
+        <div class="section-title">
+            <span>Quick Access</span>
+        </div>
+
+        <div class="items-container">
+            <div class="vm_vault_tabs">
+                <div class="vm_vault_tab active" data-tab="pin">Favorites</div>
+                <div class="vm_vault_tab" data-tab="recent">Recent</div>                
+                <div class="vm_vault_tab" data-tab="top">Top</div>
+            </div>
+            <div id="vm_tab_pin" class="vm_tab_content active">
+                <div data-loader="dashboard.pin_fav" class="dashboard-loader hide">
+                    <ons-progress-circular indeterminate class="dashboard-spinner"></ons-progress-circular>
+                </div>
+
+                <div id="vm_pin_fav_empty" data-empty="dashboard.pin_fav"></div>
+                <div id="vm_pin_fav_vaults" data-item="dashboard.pin_fav"></div>
+
+                <div class="action-footer-card hide" id="vm_pin_fav_footer" data-footer="dashboard.pin_fav">
+                    <button class="vm_vault_dash_view_all_btn" onclick="redirect_to(1, 'pinFav|pin_fav')">View All</button>
+                </div>
+            </div>
+
+            <div id="vm_tab_recent" class="vm_tab_content">
+                <div data-loader="dashboard.recent_used" class="dashboard-loader hide">
+                    <ons-progress-circular indeterminate class="dashboard-spinner"></ons-progress-circular>
+                </div>
+
+                <div id="vm_recently_used_vaults" data-item="dashboard.recent_used"></div>
+                <div id="vm_recently_used_empty" data-empty="dashboard.recent_used"></div>
+
+                <div class="action-footer-card hide" id="vm_recently_used_footer" data-footer="dashboard.recent_used">
+                    <button class="vm_vault_dash_view_all_btn" onclick="redirect_to(1, 'sort|recent_used')">View All</button>
+                </div>
+            </div>
+            <div id="vm_tab_top" class="vm_tab_content">
+                <div data-loader="dashboard.top_used" class="dashboard-loader hide">
+                    <ons-progress-circular indeterminate class="dashboard-spinner"></ons-progress-circular>
+                </div>
+
+                <div id="vm_top_vaults" data-item="dashboard.top_used"></div>
+                <div id="vm_top_empty" data-empty="dashboard.top_used"></div>
+
+                <div class="action-footer-card hide" id="top_vault_btn_wrapper" data-footer="dashboard.top_used">
+                    <button class="vm_vault_dash_view_all_btn" onclick="redirect_to(1, 'sort|most_used')">View All</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">
+            <span>Attention Required</span>
+        </div>
+        <div id="vm_attention" class="vm_attention items-container">
+            <div class="vm_attention_header">
+                <i id="vm_attention_icon" class="fa fa-exclamation-triangle"></i>
+                <span id="vm_attention_title"></span>
+                <span id="vm_attention_count"></span>                
+            </div>
+            <div class="vm_attention_items">
+
+                <div class="vm_attention_item hide" onclick="redirect_to(1, 'weakPassword|1')">
+                    <div>
+                        <span class="ai_label">Insecure passwords</span>
+                        <div class="ai_desc" id="att_weak_pwd_desc"></div>
+                    </div>
+                    <span class="ai_count" id="att_weak_pwd">0</span>
+                </div>
+
+                <div class="vm_attention_item hide" onclick="redirect_to(1, 'security|very_critical')">
+                   <div>
+                      <span class="ai_label">Critical passwords</span>
+                      <div class="ai_desc" id="att_critical_pwd_desc"></div>
+                   </div>
+                   <span class="ai_count" id="att_critical_pwd">0</span>
+                </div>
+
+                <div class="vm_attention_item" onclick="redirect_to(1, 'vaultReminderMissing|expired')">
+                    <div>
+                        <span class="ai_label">Expired documents</span>
+                        <div class="ai_desc" id="att_expired_desc"></div>
+                    </div>
+                    <span class="ai_count" id="att_expired">0</span>
+                </div>
+
+                <div class="vm_attention_item" onclick="redirect_to(1, 'vaultReminderMissing|without')">
+                    <div>
+                        <span class="ai_label">Vaults missing reminders</span>
+                        <div class="ai_desc" id="att_missing_rem_desc"></div>
+                    </div>
+                    <span class="ai_count" id="att_missing_rem">0</span>
+                </div>
+                <div class="vm_attention_item" onclick="redirect_to(2, 'due_days|30')">
+                    <div>
+                        <span class="ai_label">Due in 30 days</span>
+                        <div class="ai_desc" id="att_due_rem_desc"></div>
+                    </div>
+                    <span class="ai_count" id="att_due_rem">0</span>
+                </div>
+            </div>
+        </div>                
+
+        <div class="section-title">
+            <span>Reminder Status</span>
+        </div>        
+        <div data-loader="dashboard.reminder_stats" class="dashboard-loader hide items-container">
+            <ons-progress-circular indeterminate class="dashboard-spinner"></ons-progress-circular>
+        </div>
+        <div class="items-container" id="vm_reminders_empty" data-empty="dashboard.reminder_stats"></div>
+
+        <div class="vm_vault_dash_reminder_summary" id="vm_reminders_container" data-item="dashboard.reminder_stats">
+            <div class="vm_vault_dash_reminder_stats">
+                <div class="vm_vault_dash_stat_item" onclick="redirect_to(2, 'time|upcoming')">
+                    <div class="vm_vault_dash_stat_icon vm_vault_dash_upcoming_icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="vm_vault_dash_stat_value vm_vault_dash_upcoming_value" id="rs_upcoming">0</div>
+                    <div class="vm_vault_dash_stat_label">Upcoming</div>
+                </div>
+                <div class="vm_vault_dash_stat_item" onclick="redirect_to(2, 'time|marked')">
+                    <div class="vm_vault_dash_stat_icon vm_vault_dash_completed_icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="vm_vault_dash_stat_value vm_vault_dash_completed_value" id="rs_completed">0</div>
+                    <div class="vm_vault_dash_stat_label">Completed</div>
+                </div>                
+            </div>
+            <div class="vm_vault_dash_reminder_progress">
+                <div class="vm_vault_dash_reminder_progress_bar" id="vm_vault_dash_reminder_progress_bar"></div>
+            </div>
+            <div class="vm_vault_dash_progress_text">
+                <span>Reminder Completion</span>
+                <span id="vm_reminder_progress_percent">0%</span>
+            </div>
+            <div class="vm_vault_dash_reminder_footer">
+                <div class="vm_vault_dash_footer_item" onclick="redirect_to(2, 'rm_stats|today')">
+                    <div class="vm_vault_dash_footer_value" id="rs_today">0</div>
+                    <div class="vm_vault_dash_footer_label">Today</div>
+                </div>
+                <div class="vm_vault_dash_footer_item" onclick="redirect_to(2, 'rm_stats|week')">
+                    <div class="vm_vault_dash_footer_value" id="rs_week">0</div>
+                    <div class="vm_vault_dash_footer_label">This Week</div>
+                </div>
+                <div class="vm_vault_dash_footer_item" onclick="redirect_to(2, 'rm_stats|month')">
+                    <div class="vm_vault_dash_footer_value" id="rs_month">0</div>
+                    <div class="vm_vault_dash_footer_label">This Month</div>
+                </div>
+            </div>
+        </div>   
+
+        <div id="vm_next_reminder" class="vm_next_reminder">
+            <div class="section-title">
+                <span>Upcoming Reminders</span>
+            </div>
+            <div class="items-container">
+                <div data-loader="dashboard.upcoming_reminders" class="dashboard-loader hide">
+                    <ons-progress-circular indeterminate class="dashboard-spinner"></ons-progress-circular>
+                </div>
+                <div class="items-container-next-rm vm_rem_list" id="next_reminder_item" data-item="dashboard.upcoming_reminders"></div>
+                <div class="items-container-next-rm" id="next_reminder_empty" data-empty="dashboard.upcoming_reminders"></div>
+
+                <div class="action-footer-card hide" id="next_reminder_footer" data-footer="dashboard.upcoming_reminders">
+                    <button onclick="redirect_to(2, 'time|upcoming')" class="vm_vault_dash_view_all_btn">View All</button>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="section-title">
+            <span>Top Categories</span>
+        </div>
+        <div data-loader="dashboard.categories" class="dashboard-loader hide items-container">
+            <ons-progress-circular indeterminate class="dashboard-spinner"></ons-progress-circular>
+        </div>
+        <div id="vm_dash_categories_emp" data-empty="dashboard.categories" class="items-container"></div>
+        <div class="card-grid" data-item="dashboard.categories" id="vm_dash_categories"></div> 
+
+
+        <div class="section-title">
+            <span>Backup Status</span>
+        </div>
+        <div data-loader="dashboard.backup" class="dashboard-loader hide items-container">
+            <ons-progress-circular indeterminate class="dashboard-spinner"></ons-progress-circular>
+        </div>
+        <div class="items-container" id="vm_backup_empty" data-empty="dashboard.backup"></div>
+        <div class="items-container" id="vm_backup_container" data-item="dashboard.backup">
+            <div class="vm_backup">
+                <div class="vm_backup_body">
+                    <div class="vm_backup_status" id="vm_backup_status">
+                        <i id="vm_backup_status_icon" class="fas fa-check-circle"></i>
+                        <span id="vm_backup_status_text"></span>
+                    </div>
+                    <div class="vm_backup_reassure" id="vm_backup_message"></div>
+                    <div class="vm_backup_coverage" id="vm_backup_coverage">
+                        <div class="vm_backup_coverage_header">
+                            <span>Backup Coverage</span>
+                            <span id="vm_backup_percent">0%</span>
+                        </div>
+                        <div class="vm_backup_progress">
+                            <div class="vm_backup_progress_bar" id="vm_backup_progress_bar"></div>
+                        </div>
+                    </div>
+
+                    <div class="vm_backup_stats_title backup_new_stats_section hide">
+                        Changes not in backup
+                    </div>
+                    <div class="vm_backup_stats_hint backup_new_stats_section hide">
+                        These items will be lost if not backed up
+                    </div>
+                    
+                    <div class="backup_new_stats_section hide" id="vm_backup_summary"></div>
+                    <div class="vm_backup_action" id="vm_backup_action"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>    
+    <script>
+
+        document.addEventListener("init", function (event) {
+            if (event.target.id !== "home") return;
+
+            const page = event.target;
+            const pullHook = document.getElementById("dashboard-pull-hook");
+            const spinnerWrap = document.getElementById("pull_spinner");
+            const arrow = document.getElementById("pull_arrow");
+            const label = document.getElementById("pull_label");
+
+            function resetIndicator() {
+                spinnerWrap.classList.add("hide");
+                arrow.classList.remove("hide", "flip");
+                label.textContent = "Pull to refresh";
+            }
+
+            // Disable while page is being shown
+            pullHook.disabled = true;
+            resetIndicator();
+                        
+            page.addEventListener("show", function () {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        resetIndicator();
+                        pullHook.disabled = false;
+                    });
+                });
+            });
+
+            pullHook.onChangeState = function (e) {
+                switch (e.state) {
+                    case "initial":
+                        resetIndicator();
+                        break;
+
+                    case "preaction":
+                        spinnerWrap.classList.add("hide");
+                        arrow.classList.remove("hide", "flip");
+                        label.textContent = "Pull to refresh";
+                        break;
+
+                    case "action":
+                        spinnerWrap.classList.add("hide");
+                        arrow.classList.remove("hide");
+                        arrow.classList.add("flip");
+                        label.textContent = "Release to refresh";
+                        break;
+                }
+            };
+
+            pullHook.onAction = async function (done) {
+                label.textContent = "Refreshing...";
+                arrow.classList.add("hide");
+                spinnerWrap.classList.remove("hide");
+
+                try {
+                    await refresh_dashboard("home_pull", true);
+                } finally {
+                    resetIndicator();
+                    done();
+                }
+            };
+        });
+
+
+        // document.addEventListener("init", function (event) {
+        //     if(event.target.id !== "home") {
+        //         return;
+        //     }
+        //     const pullHook = document.getElementById("dashboard-pull-hook");
+        //     const spinnerWrap = pullHook.querySelector(".home_pull_refresh");
+
+        //     pullHook.onChangeState = function (e) {
+
+        //         console.log("e.state", e.state);
+
+        //         if(e.state === "initial") {
+        //             spinnerWrap.classList.add("hide");
+        //         }
+        //         if (e.state === "preaction") {
+        //           spinnerWrap.classList.remove("hide");
+        //         }
+        //         if (e.state === "action") {
+        //           spinnerWrap.classList.remove("hide");
+        //         }
+        //     };
+        //     pullHook.onAction = async function (done) {
+        //         spinnerWrap.classList.remove("hide");
+        //         try {                    
+        //             await refresh_dashboard("home_pull", true);
+        //         } finally {
+        //             spinnerWrap.classList.add("hide");
+        //             done();
+        //         }
+        //     };
+        // });
+    </script>
+</ons-page>
