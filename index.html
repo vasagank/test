@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>MahaVault</title>
+        <meta name="viewport" content="initial-scale=1, width=device-width, height=device-height, viewport-fit=cover">
+        <meta name="color-scheme" content="light dark">
+
+        <script src="js/mode.js"></script>
+        <link rel="stylesheet" href="package/css/onsenui.min.css" />
+        <link rel="stylesheet" href="package/css/onsen-css-components.min.css" />
+        <link rel="stylesheet" href="css/style.css" />
+
+        <script src="package/js/onsenui.min.js"></script>
+        <script src="js/crypto-js.min.js"></script> 
+        <!-- <script src="js/zxcvbn.js"></script>  -->
+        
+        <script src="js/fields.js"></script> 
+        <script src="js/helper.js"></script>  
+        <script src="js/database.js"></script> 
+                 
+        <script src="js/vault.js"></script> 
+        <script src="js/reminder.js"></script> 
+        
+        <script src="js/app.js"></script>    
+        <script src="js/dashboard.js"></script>  
+        <script src="js/backup.js"></script> 
+        <script src="js/billing.js"></script> 
+        <script src="js/import.js"></script> 
+
+        <link rel="stylesheet" href="css/dashboard.css">
+        <link rel="stylesheet" href="css/vault.css">
+        <link rel="stylesheet" href="css/reminder.css" />
+        <link rel="stylesheet" href="css/settings.css">
+        <link rel="stylesheet" href="css/common.css">
+        <link rel="stylesheet" href="css/import.css" /> 
+        <link rel="stylesheet" href="css/pricing.css" /> 
+
+        <script>ons.platform.select("android");</script>  
+
+        <script type="text/javascript"> 
+            const bg = app_mode === "dark" ? "#121212" : "#f8f9fa";
+            const header_bg = app_mode === "dark" ? "#121212" : "#4361ee";
+            const header_ic = app_mode === "dark" ? "fa fa-sun" : "fa fa-moon";
+            document.write(`<style>
+                body, html, .page__content, .page--material__background, .page__background {
+                    background:${bg} !important;
+                    background-color:${bg} !important;
+                }
+                .vm-header {    
+                    background-color: ${header_bg} !important;
+                }
+            </style>`);
+            if(app_mode === "dark") {
+                document.documentElement.classList.add("vm-dark-theme");
+            }
+        </script>   
+    </head>
+
+    <body id="indexPage">
+        
+        <!-- <header class="vm-header">
+            <a href="#" class="vm-logo">
+                <span class="logo_text">MahaVault</span>  
+            </a>
+            <div class="vm-search-container" id="vmSearch">
+                <input type="text" class="vm-search-input" enterkeyhint="search" placeholder="Search vaults..."/>
+                <button class="vm-search-apply" id="vmSearchApply">
+                    <i class="fa fa-search"></i>
+                </button>
+            </div>
+            <div class="vm-header-actions">
+                <button class="vm-search-toggle" id="vmSearchToggle">
+                    <i class="fa fa-search"></i>
+                </button>
+                <button class="vm-theme-toggle" id="vmThemeToggle">
+                    <script>document.write(`<i class="${header_ic}"></i>`);</script>
+                </button>
+                <button class="vm-settings-toggle" onclick="redirect_to(3)">
+                    <i class="fa fa-cog"></i>
+                </button>
+            </div>
+        </header>  --> 
+        
+        <ons-tabbar class="vm_tabbar visible" id="mainTabbar">
+            <ons-tab page="home.html" class="vm-nav-item" label="Home" icon="fa-home" active></ons-tab>
+            <ons-tab page="passwords.html" class="vm-nav-item" label="Vault" icon="fa-shield-alt"></ons-tab>
+            <ons-tab page="reminders.html" class="vm-nav-item" label="Reminder" icon="fa-bell"></ons-tab>
+            <ons-tab page="records.html" class="vm-nav-item" label="Records" icon="fa-folder-open"></ons-tab>
+            <ons-tab page="ledger.html" class="vm-nav-item" label="Ledger" icon="fa-wallet"></ons-tab>
+        </ons-tabbar>
+
+       <!--  <ons-tab page="settings_wrapper.html" class="vm-nav-item hide"></ons-tab>
+            <ons-tab page="upgrade.html" id="upgrade_tab" class="vm-hidden-tab hide"></ons-tab>
+            <ons-tab page="csv.html" id="csv_tab" class="vm-hidden-tab hide"></ons-tab> -->
+
+        <ons-navigator id="overlayNavigator" page="blank_overlay.html" class="vm-overlay-nav hide"></ons-navigator>
+        
+        <ons-fab data-target="vm_bottomSheet" position="bottom right" modifier="primary" class="fab-add vm-fab vm-sheet-open">
+            <ons-icon icon="md-plus"></ons-icon>
+        </ons-fab>
+
+        <ons-fab data-target="vm_remainder_bottom_sheet" position="bottom right" modifier="primary" class="fab-add vm-fab vm-sheet-open hide" id="vm_vault_addButton">
+            <ons-icon icon="md-plus"></ons-icon>
+        </ons-fab>
+
+        <div class="page-loader-wrap" id="pageloader">
+            <ons-progress-circular indeterminate></ons-progress-circular>
+        </div> 
+        <div id="app_toast" class="app-toast"></div>
+
+        <!-- <div id="vmi_loader_overlay" class="vmi_loader_overlay hide">
+            <div class="loader_box">            
+                <div class="loader_icon">
+                    <ons-progress-circular indeterminate></ons-progress-circular>
+                </div>
+                <div class="loader_text" id="vmi_loader_text">Importing...</div>
+            </div>
+        </div> -->
+
+        <div id="vmi_loader_overlay" class="vmi_loader_overlay hide">
+          <div class="loader_box">
+            <div class="loader_bar_wrap">
+                <div id="vmi_loader_bar" class="loader_bar"></div>
+            </div>
+            <div id="vmi_loader_text" class="loader_text">
+                Importing...
+            </div>
+          </div>
+        </div>
+        
+        <!--CUSTOM TOOLBAR REMINDERS PAGE-->
+        <!-- <div id="customToolbar" class="custom_header vm-hidden">
+            <div class="vm_vault_actions_all">
+                <div class="vm_vault_actions">
+                    <button data-action="sort" class="vm-sheet-open vm_vault_actionButton with-separator" id="vm_vault_sortButton">
+                        <i class="fa fa-sort-amount-asc"></i> Sort By 
+                    </button>
+                    <button data-action="filter" class="vm-sheet-open vm_vault_actionButton with-separator" id="vm_vault_filterButton">
+                        <i class="fa fa-filter"></i> Filter 
+                    </button>                 
+                </div>
+            </div>
+        </div> -->
+
+        <!--CUSTOM HEADER SETTINGS PAGE-->
+        <!-- <div class="custom_header_all vm-hidden">
+            <div class="left">
+                <ons-back-button></ons-back-button>
+            </div>
+            <div class="custom_page_title" id="custom_page_title">Settings</div>
+        </div> -->
+
+        <div id="vm_global_overlay" class="vm-overlay"></div> 
+
+        <div id="vm_bottomSheet" class="vm-bottom-sheet">
+            <!-- <div class="vm_remainder_sheet_handle"></div>             -->
+            <div class="vm-cats-horizontal" id="vm_catsHorizontal"></div>
+            <div class="vm-form" id="vm_formContainer"></div>
+            <div id="vm_sheetActions" class="vm-actions">
+                <button type="button" class="btn btn-outline gen_btn cancel_btn" onclick="close_bottom_sheet()">Cancel</button>
+                <button type="button" class="btn btn-primary save_vault gen_btn" onclick="save_vault(event)" data-loader>
+                    <span class="btn-text">Save Vault</span>
+                    <span class="btn-loader"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="vm_vault_bottomSheet vm-bottom-sheet" id="vm_vault_filterSheet">
+            <div class="vm_vault_bottomSheetHeader">
+                <h2 class="vm_vault_bottomSheetTitle">Filter Vaults</h2>
+                <button class="vm_vault_bottomSheetClose" onclick="close_bottom_sheet()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="vm_vault_filterOption">
+                <div class="vm_vault_filter_list">
+                    <label class="vm_remainder_form_label">Search</label>
+                    <input type="text" id="vm_vault_searchInput" class="vm_vault_searchBox" placeholder="Search title, notes, and details..." inputmode="search" />
+                </div>
+                <div class="vm-row">
+                    <label class="vm_remainder_form_label">Status</label>
+                    <select id="vm_priority">
+                        <option value="" selected>All vaults</option>
+                        <option value="pin_fav">Pinned & favorited</option>
+                        <option value="fav">Favorited only</option>
+                        <option value="pin">Pinned only</option>
+                        <option value="attachment">Has Attachments</option>
+                        <option value="no_attachment">No Attachments</option>
+                    </select>                                        
+                </div>  
+                <div class="vm-row">
+                    <label class="vm_remainder_form_label">Reminder</label>
+                    <select id="vm_reminder">
+                        <option value="" selected>All vaults</option>
+                        <option value="with">Reminder enabled</option>
+                        <option value="without">Reminder not set</option>
+                    </select>                                        
+                </div>     
+                <div class="vm_vault_filter_list pd_5px">                    
+                    <div class="vm_category_actions">
+                        <label class="vm_remainder_form_label mb-0">Categories</label>
+                        <button type="button" class="vm_link_btn ml-auto select_all" id="vm_cat_select_all">Select all</button>
+                        <button type="button" class="vm_link_btn clear_all" id="vm_cat_unselect_all">Clear</button>
+                    </div>
+                    <div class="vm_vault_filter_list">
+                        <div id="vault_category_checklist" class="vm_category_checklist"></div>
+                    </div>
+                </div> 
+
+                <div class="vm_vault_filter_list">
+                    <label class="vm_remainder_form_label">Date Range</label>
+                    <div class="vm_vault_filterOptionChoices" id="vm_date_range">
+                        <div class="bottom_sheet_tags active text-center" data-range="any">Anytime</div>
+                        <div class="bottom_sheet_tags text-center" data-range="7">Last 7 Days</div>
+                        <div class="bottom_sheet_tags text-center" data-range="14">Last 14 Days</div>
+                        <div class="bottom_sheet_tags text-center" data-range="30">Last 30 Days</div>
+                        <div class="bottom_sheet_tags text-center" data-range="90">Last 90 Days</div>
+                        <div class="bottom_sheet_tags text-center" data-range="custom">Custom</div>
+                    </div>
+                    <div class="vm_custom_date_range" id="vm_custom_date_range">
+                        <div class="vm-row-d-flex" data-date-group>
+                            <div class="vm-row-flex">
+                                <label class="vm_remainder_form_label">From</label>
+                                <input type="date" id="vm_date_from" data-date="start">
+                            </div>
+                            <div class="vm-row-flex">
+                                <label class="vm_remainder_form_label">To</label>
+                                <input type="date" id="vm_date_to" data-date="end">
+                            </div>
+                        </div>                       
+                    </div>
+                </div>               
+            </div>
+            <div class="vm_vault_filterActions">
+                <button class="vm_link_btn mr-auto clear_filter_bar" id="vm_vault_clearFilter" disabled>Clear filters</button>
+                <button class="vm_vault_applyBtn btn btn-primary" id="vm_vault_applyFilter">Apply</button>
+            </div>
+        </div>
+
+        <div class="vm_vault_bottomSheet vm-bottom-sheet" id="vm_vault_sortSheet">
+            <div class="vm_vault_bottomSheetHeader">
+                <h2 class="vm_vault_bottomSheetTitle">Sort By</h2>
+                <button class="vm_vault_bottomSheetClose" onclick="close_bottom_sheet()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="vm_vault_filterOption">
+                <div class="vm_vault_filterOptionChoices" id="vm_sort_bs">
+                    <div class="bottom_sheet_tags active vault_sort" data-value="new_first">Newest First</div>
+                    <div class="bottom_sheet_tags vault_sort" data-value="old_first">Oldest First</div>
+                    <div class="bottom_sheet_tags vault_sort" data-value="recent_used">Recently Used</div>
+                    <div class="bottom_sheet_tags vault_sort" data-value="weak_pwd">Weakest Password</div>
+                    <div class="bottom_sheet_tags vault_sort" data-value="strong_pwd">Strongest Password</div>
+                    <div class="bottom_sheet_tags vault_sort" data-value="most_used">Most Used</div>                
+                </div>
+            </div>
+        </div>
+        
+        <div class="vm_remainder_bottom_sheet vm-bottom-sheet" id="vm_remainder_sort_sheet">
+            <div class="vm_vault_bottomSheetHeader">
+                <h2 class="vm_vault_bottomSheetTitle">Sort By</h2>
+                <button class="vm_vault_bottomSheetClose" onclick="close_bottom_sheet()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="vm_vault_filterOption">
+                <div class="vm_vault_filterOptionChoices" id="rm_sort_bs">     
+                    <div class="bottom_sheet_tags rm_sort active" data-value="new_first">Newest First</div>               
+                    <div class="bottom_sheet_tags rm_sort" data-value="upcoming_first">Upcoming First</div>                    
+                    <div class="bottom_sheet_tags rm_sort" data-value="oldest_first">Oldest First</div>
+                    <div class="bottom_sheet_tags rm_sort" data-value="name_asc">Name A–Z</div>
+                    <div class="bottom_sheet_tags rm_sort" data-value="name_desc">Name Z–A</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="vm_remainder_bottom_sheet vm-bottom-sheet" id="vm_remainder_bottom_sheet">
+            <div class="vm_remainder_sheet_header">
+                <h2 class="vm_remainder_sheet_title" id="reminder_sheet_title">Add New Reminder</h2>
+                <button class="vm_remainder_sheet_close" onclick="close_bottom_sheet()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="vm_remainder_sheet_body">
+                <form id="vm_remainder_form" data-date-group>
+                    <div class="vm_remainder_form_group">
+                        <label class="vm_remainder_form_label">Category *</label>
+                        <select id="rm_category" class="vm_remainder_form_input"></select>
+                    </div>
+                    <div class="vm_remainder_form_group">
+                        <label class="vm_remainder_form_label">Title *</label>
+                        <input type="text" id="rm_title" class="vm_remainder_form_input" placeholder="Enter reminder title" required>
+                    </div>
+                    <div class="vm_remainder_form_group">
+                        <label class="vm_remainder_form_label">Description</label>
+                        <textarea id="rm_desc" class="vm_remainder_form_textarea" placeholder="Enter reminder description"></textarea>
+                    </div>                                      
+                    <div class="vm_remainder_type_selector">
+                        <div class="vm_remainder_form_group full_width">
+                            <label class="vm_remainder_form_label">Start Date *</label>
+                            <input type="date" id="rm_start_date" class="vm_remainder_form_input" data-date="start" data-start-rule="today">
+                        </div>
+                        <div class="vm_remainder_form_group full_width">
+                            <label class="vm_remainder_form_label">Time *</label>
+                            <input type="time" id="rm_time" class="vm_remainder_form_input">
+                        </div>
+                    </div>  
+                    <div class="vm_remainder_form_group">
+                        <label class="vm_remainder_form_label">Reminder Type</label>
+                        <div class="vm_remainder_type_selector vm_rm_type_sel">
+                            <div class="vm_remainder_type_option active" data-type="onetime">
+                                One time
+                            </div>
+                            <div class="vm_remainder_type_option vm_rm_type_sel" data-type="repeat">
+                                Repeat
+                            </div>
+                        </div>
+                        <div class="vm_remainder_repeat_options" id="vm_remainder_repeat_options">
+                            <div class="vm_remainder_form_group">
+                                <label class="vm_remainder_form_label">Repeat Interval</label>
+                                <select class="vm_remainder_form_select" id="repeat_interval">
+                                    <option value="hourly">Hourly</option>
+                                    <option value="daily" selected>Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                    <option value="yearly">Yearly</option>
+                                </select>
+                            </div>
+                            <div class="vm_remainder_form_group">
+                                <label class="vm_remainder_form_label">End Date</label>
+                                <input type="date" class="vm_remainder_form_input" id="rm_repeat_end_date" data-date="end">
+                            </div>
+                        </div>
+                    </div>                  
+                </form>                
+            </div>
+            <div class="btn_wrapper_rm vm-actions">
+                <button type="button" id="rm_save" class="vm_remainder_form_submit" data-loader onclick="save_rm_item(event)">
+                    <span class="btn-text">Save Reminder</span>
+                    <span class="btn-loader"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="vm_remainder_bottom_sheet vm-bottom-sheet" id="vm_remainder_filter_sheet">
+            <div class="vm_remainder_sheet_header">
+                <h2 class="vm_remainder_sheet_title">Filter Reminders</h2>
+                <button class="vm_vault_bottomSheetClose" onclick="close_bottom_sheet()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="vm_remainder_sheet_body">     
+                <div class="vm-row">
+                    <label class="vm_remainder_form_label">Search</label>
+                    <input type="text" id="vm_rm_search" placeholder="Search title and description">
+                </div>
+
+                <div class="vm-row">
+                    <label class="vm_remainder_form_label">Reminder Type</label>
+                    <div class="vm_vault_filterOptionChoices" id="vm_reminder_type">
+                        <div class="bottom_sheet_tags text-center active" data-type="">All</div>
+                        <div class="bottom_sheet_tags text-center" data-type="onetime">One time</div>
+                        <div class="bottom_sheet_tags text-center" data-type="repeat">Repeat</div>
+                    </div>                    
+                </div>
+
+                <div class="vm-row">
+                    <label class="vm_remainder_form_label">When</label>
+                    <select id="vm_reminder_time">
+                        <option value="" selected>All</option>
+                        <option value="upcoming">Upcoming</option>
+                        <option value="marked">Completed</option>
+                    </select>                                        
+                </div>     
+
+               <div class=" vm-row">
+                    <label class="vm_remainder_form_label">Source</label>
+                    <select id="vm_reminder_source">
+                        <option value="" selected>All</option>
+                        <option value="personal">Personal</option>
+                        <option value="vault">Vault</option>
+                    </select>                                        
+                </div>
+                
+                <div class="vm_vault_filter_list pd_5px">                    
+                    <div class="vm_category_actions">
+                        <label class="vm_remainder_form_label mb-0">Categories</label>
+                        <button type="button" class="vm_link_btn ml-auto select_all" onclick="rm_select_all()">Select all</button>
+                        <button type="button" class="vm_link_btn clear_all" onclick="rm_clear_all()">Clear</button>
+                    </div>
+                    <div class="vm_vault_filter_list">
+                        <div id="rm_category_checklist" class="vm_category_checklist"></div>
+                    </div>
+                </div> 
+
+                <div class="vm_vault_filter_list">
+                    <label class="vm_remainder_form_label">Date Range</label>
+                    <div class="vm_vault_filterOptionChoices" id="rm_date_range">
+                        <div class="bottom_sheet_tags active text-center" data-range="any">Anytime</div>
+                        <div class="bottom_sheet_tags text-center" data-range="7">Last 7 Days</div>
+                        <div class="bottom_sheet_tags text-center" data-range="14">Last 14 Days</div>
+                        <div class="bottom_sheet_tags text-center" data-range="30">Last 30 Days</div>
+                        <div class="bottom_sheet_tags text-center" data-range="90">Last 90 Days</div>
+                        <div class="bottom_sheet_tags text-center" data-range="custom">Custom</div>
+                    </div>
+                    <div class="vm_custom_date_range" id="rm_custom_date_range" data-date-group>
+                        <div class="vm-row-d-flex">
+                            <div class="vm-row-flex">
+                                <label class="vm_remainder_form_label">From</label>
+                                <input type="date" id="rm_date_from" data-date="start">
+                            </div>
+                            <div class="vm-row-flex">
+                                <label class="vm_remainder_form_label">To</label>
+                                <input type="date" id="rm_date_to" data-date="end">
+                            </div>
+                        </div>                       
+                    </div>
+                </div>
+            </div>
+            <div class="vm_vault_filterActions">
+                <button class="vm_link_btn mr-auto" id="vm_rm_clearFilter" disabled>Clear filters</button>
+                <button class="vm_remainder_filter_apply" id="vm_remainder_filter_apply">Apply Filters</button>
+            </div>
+        </div>
+        
+        <div id="vm_view_sheet" class="vm-bottom-sheet">
+            <div class="vm_sheet_header view_vault_header">
+                <h2 class="vm_sheet_title" id="view_vault_detail">View Vault</h2>
+                <div class="vm-view-header-actions">                    
+                    <button class="vm-menu-btn">
+                        <i id="vv-pin" class="fas fa-thumbtack vm-vv-pin"></i>
+                    </button>
+                    <button class="vm-menu-btn">
+                        <i id="vv-fav" class="fas fa-star vm-vv-fav"></i>
+                    </button>
+                    <button class="vm-menu-btn" onclick="toggleVaultMenu(event)">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+                <div class="vm-dropdown hide" id="vaultMenu">
+                    <button onclick="copy_selected_fields()">
+                        <i class="far fa-check-square"></i>
+                        Copy Selected
+                    </button>
+                    <button onclick="all_action('share')">
+                        <i class="fas fa-share-alt"></i> Share
+                    </button>
+                    <button class="danger" onclick="delete_sheet_vault()">
+                        <i class="fa fa-trash-o"></i> Move to Trash
+                    </button>
+                </div>
+            </div>
+            <div id="vm_view_content_all" class="vm_sheet_body">
+                <div id="vm_view_content"></div>                
+            </div>
+
+            <div id="vm_copy_select_panel" class="vm_sheet_body hide">                
+                <div id="vm_copy_select_list" class="vm_copy_select_list"></div>
+            </div>
+
+            <div class="vm-actions margin_top_auto" id="vm_view_actions">
+                <button class="vm-btn vm-btn-edit" onclick="edit_view_vault()">Edit</button>
+                <button class="vm-btn vm-btn-copy" onclick="all_action('copy')">Copy</button>
+            </div>
+            <div class="vm-actions margin_top_auto hide" id="vm_copy_select_actions">
+                <button class="vm-btn vm-btn-cancel" onclick="cancel_copy_selected()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button class="vm-btn vm-btn-share" onclick="copy_selected_action('share')">
+                    <i class="fas fa-share-alt"></i> Share
+                </button>
+                <button class="vm-btn vm-btn-copy" onclick="copy_selected_action('copy')">
+                    <i class="far fa-copy"></i> Copy
+                </button>
+            </div>
+
+        </div>
+
+        <div id="vm_rm_view_sheet" class="vm-bottom-sheet">
+            <div class="vm_sheet_header view_vault_header">
+                <h2 class="vm_sheet_title" id="view_rm_detail">View Reminder</h2>  
+            </div>
+            <div id="vm_view_content_all" class="vm_sheet_body">
+                <div id="vm_rm_view_content"></div>                
+            </div>
+            <div class="vm-actions margin_top_auto" id="vm_rm_actions"></div>
+        </div>
+
+        <ons-action-sheet id="vaultActionSheet" class="vm-vault-sheet" cancelable>
+            <ons-action-sheet-button id="as-pin">
+                <i class="fas fa-thumbtack"></i>
+                <span id="as-pin-text">Pin</span>
+            </ons-action-sheet-button>
+            <ons-action-sheet-button id="as-fav">
+                <i class="fas fa-star"></i>
+                <span id="as-fav-text">Favorite</span>
+            </ons-action-sheet-button>
+            <ons-action-sheet-button id="as-edit">
+                <i class="fas fa-edit"></i>
+                <span>Edit</span>
+            </ons-action-sheet-button>
+            <ons-action-sheet-button id="as-delete" modifier="destructive">
+                <i class="fas fa-trash-alt"></i>
+                <span>Delete</span>
+            </ons-action-sheet-button>            
+        </ons-action-sheet>        
+
+        <script src="cordova.js"></script>
+        <script type="text/javascript">
+            bottom_sheet_overlay = dgi("vm_global_overlay");
+
+            //let active_bottom_sheet = null;   
+            let current_vault_id = null;
+            let is_edit_mode = false;
+            let edit_vault_id = null;
+            let activeVaultId = null;
+            let edit_attachments = [];            
+
+            let filter_date_range = "any";
+            let vault_filters = {
+                sort: "new_first", 
+                search: "", 
+                categories: [], 
+                dateRange: null, 
+                pinFav:null,
+                vaultReminderMissing:null, 
+                weakPassword:null, 
+                security:null,  
+                hashPassword:null,            
+            };
+            let vault_initialized = false;
+            let etitle = "No vaults yet";
+            let edesc = "Start by adding your first vault to keep passwords secure.";
+
+            let is_rm_mode = false;
+            let editing_rm_id = null;
+            let reminder_initialized = false;
+            let rm_filters = {
+                sort:"new_first", 
+                search:"", 
+                type:"", 
+                time:"", 
+                source:"", 
+                date_range : null,
+                due_days: null,
+                rm_stats:null,
+                categories: []
+            };
+            let dashboard_action = null;   
+
+            document.addEventListener("input", function(e) {
+                if(e.target.id === "card_expiry_date") {
+                    let val = e.target.value.replace(/\D/g, "");
+                    if(val.length > 2) {
+                        val = val.slice(0,2) + " / " + val.slice(2,4);
+                    }
+                    e.target.value = val.slice(0,7);
+                } else if(e.target.id === "card_card_no") {
+                    let val = e.target.value.replace(/\D/g, ""); 
+                    val = val.slice(0,19);
+                    val = val.match(/.{1,4}/g)?.join(" ") || val;
+                    e.target.value = val;
+                }
+                return;                
+            });
+
+            ons.ready(() => {                
+
+                setTimeout(() => {
+                    render_categories().catch(console.error);
+                }, 0);
+
+                setTimeout(() => {
+                    document.getElementById("mainTabbar").classList.add("visible");
+                }, 200); 
+
+                const gesture = new ons.GestureDetector(document);
+                gesture.on("hold", function (event) {
+                    const item = event.target.closest('.list-item[data-vault-id]');
+                    if(!item) {
+                        return;
+                    }
+                    event.preventDefault(); event.stopPropagation();
+                    openVaultOptions(item.dataset.vaultId);
+                }); 
+
+                const typeOptions = document.querySelectorAll(".vm_remainder_type_option");
+                const repeatOptions = dgi("vm_remainder_repeat_options");
+                typeOptions.forEach(option => {
+                    option.addEventListener("click", () => {
+                        typeOptions.forEach(opt => opt.classList.remove("active"));
+                        option.classList.add("active");
+                        if(option.dataset.type === "repeat") {
+                            repeatOptions.classList.add("active");
+                        } else {
+                            repeatOptions.classList.remove("active");
+                        }
+                    });
+                });
+                populate_rm_category("rm_category");
+            });
+
+            let home_search_initialized = false;
+            document.addEventListener("init", function (event) {
+
+                if(event.target.id === "home") {
+                    if(home_search_initialized) {
+                        return;
+                    }
+                    home_search_initialized = true;
+
+                    const vmThemeToggle = document.getElementById("vmThemeToggle");
+                    const vmIcon = vmThemeToggle.querySelector("i");  
+
+                    const isDark = document.documentElement.classList.contains("vm-dark-theme");
+                    vmIcon.className = isDark ? "fa fa-sun" : "fa fa-moon";
+                    vmThemeToggle.addEventListener('click', () => {
+                        document.documentElement.classList.toggle('vm-dark-theme');
+                        localStorage.setItem('vm-theme', document.documentElement.classList.contains('vm-dark-theme') ? 'dark' : 'light');
+                        location.reload();
+                    });
+
+                    const header = document.querySelector(".vm-home-toolbar");
+                    if(localStorage.getItem("vm-theme") === "dark") {
+                        document.documentElement.classList.add("vm-dark-theme");
+                        vmIcon.classList.remove("fa-moon");
+                        vmIcon.classList.add("fa-sun");
+                    } 
+
+                    const vmSearchToggle  = document.getElementById("vmSearchToggle");
+                    const vmSearchApply   = document.getElementById("vmSearchApply");
+                    const vmSearchInput   = document.querySelector(".vm-search-input");
+                    const vmSearchIcon    = vmSearchToggle.querySelector("i");
+
+                    vmSearchToggle.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        if(header.classList.contains("vm-search-active")) {
+                            closeSearch();
+                        } else {
+                            openSearch();
+                        }
+                    });
+
+                    function openSearch() {
+                        header.classList.add("vm-search-active");
+                        vmSearchIcon.className = "fa fa-arrow-left";
+                        vmSearchInput.focus();
+                    }
+
+                    function closeSearch() {
+                        header.classList.remove("vm-search-active");
+                        vmSearchIcon.className = "fa fa-search";
+                        vmSearchInput.blur();
+                        vmSearchInput.value = "";
+                    }
+
+                    vmSearchApply.addEventListener("click", () => {
+                        const val = vmSearchInput.value.trim();
+                        if(!val) {
+                            show_toast("Please enter something to search");                    
+                            vmSearchInput.focus();
+                            return;
+                        }
+                        vmSearchInput.blur();
+                        redirect_to(1, 'search|'+val);
+                    });
+
+                    vmSearchInput.addEventListener("keydown", (e) => {
+                        if(e.key === "Enter" || e.keyCode === 13) {
+                            e.preventDefault();
+                            vmSearchApply.click();
+                        }
+                    });
+
+                    document.addEventListener("click", (e) => {
+                        if(header.classList.contains("vm-search-active") && !e.target.closest("#home_toolbar")) {
+                            closeSearch();
+                        }
+                    });
+
+                    document.addEventListener("keydown", (e) => {
+                        if(e.key === "Escape" && header.classList.contains("vm-search-active")) {
+                            closeSearch();
+                        }
+                    });                    
+                }
+
+                if(event.target.id === "home" && _MODE_ == "dev") {
+                    refresh_dashboard(event.target.id);
+                }
+
+                const home_content = event.target.querySelector(".page__content");
+                let vmLastScrollTop = 0;
+                let bottomLock = false;
+                let ticking = false;
+
+                const UNLOCK_OFFSET = 60;
+                const BOTTOM_THRESHOLD = 8;
+                let idleTimer = null;
+                const IDLE_DELAY = 1800; 
+
+                home_content.addEventListener("scroll", () => {
+
+                    if(ticking) {
+                        return;
+                    }
+                    ticking = true;
+
+                    if(idleTimer) {
+                        clearTimeout(idleTimer);
+                        idleTimer = null;
+                    }
+
+                    requestAnimationFrame(() => {
+
+                        const scrollTop = home_content.scrollTop;
+                        const clientHeight = home_content.clientHeight;
+                        const scrollHeight = home_content.scrollHeight;
+
+                        const isScrollingDown = scrollTop > vmLastScrollTop;
+                        const isAtBottom = (scrollTop + clientHeight) >= (scrollHeight - BOTTOM_THRESHOLD);
+
+                        if(isAtBottom) {
+                            bottomLock = true;
+                            document.querySelector(".tabbar__content")?.classList.remove("vm-tab-hidden");
+                            document.querySelector(".tabbar")?.classList.remove("vm-hidden");
+                        }
+
+                        if(bottomLock && (scrollHeight - clientHeight - scrollTop) > UNLOCK_OFFSET) {
+                            bottomLock = false;
+                        }
+
+                        if(!bottomLock) {
+                            if (isScrollingDown && scrollTop > 100) {
+                                document.querySelector(".tabbar__content")?.classList.add("vm-tab-hidden");
+                                document.querySelector(".tabbar")?.classList.add("vm-hidden");
+                            } else {
+                                document.querySelector(".tabbar__content")?.classList.remove("vm-tab-hidden");
+                                document.querySelector(".tabbar")?.classList.remove("vm-hidden");
+                            }
+                        }
+
+                        if(!isAtBottom && document.querySelector(".tabbar")?.classList.contains("vm-hidden")) {
+                            idleTimer = setTimeout(() => {
+                                document.querySelector(".tabbar__content")?.classList.remove("vm-tab-hidden");
+                                document.querySelector(".tabbar")?.classList.remove("vm-hidden");
+                            }, IDLE_DELAY);
+                        }
+
+                        vmLastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
+                        ticking = false;
+                    });
+                });
+            });            
+
+            // document.addEventListener("click", () => {
+            //   dgi("vaultMenu")?.classList.add("hide");
+            // });
+
+            document.addEventListener("postchange", function (event) {
+                const activePage = event.tabItem.pageElement;
+                const vmFab = document.querySelector(".vm-fab");
+                let active_id = activePage.id;
+                const page_content = activePage.querySelector(".page__content");
+                var tabbar = document.getElementById('mainTabbar');
+
+                if(page_content) {
+                    //page_content.scrollTop = 0;
+                }
+
+                if(active_id == "upgrade_page" || active_id === "settings" || active_id == "settings_page" || active_id == "change_pin") {
+                    tabbar.classList.add('settings-fullscreen');
+                } else {
+                    tabbar.classList.remove('settings-fullscreen');
+                }   
+
+                if(active_id === "home" || active_id === "vault_page") {                    
+                    vmFab.classList.remove('vm-hidden');
+                } else {
+                    vmFab.classList.add('vm-hidden');
+                }               
+            });           
+            
+        </script>
+    </body>
+</html>
