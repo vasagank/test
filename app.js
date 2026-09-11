@@ -303,6 +303,27 @@ async function runVaultMateFlow() {
   }
 }
 
+document.addEventListener("deviceready", async function() {
+    if (!window.MahaDigest) {
+        return;
+    }
+    try {
+        const result = await new Promise((resolve) => {
+            MahaDigest.getLaunchIntentAction(resolve, () => resolve(null));
+        });
+        if (result && result.tab !== null && result.tab !== undefined) {
+            if (sessionActive) {
+                redirect_to(result.tab, result.action || null);
+            } else {
+                localStorage.setItem("pendingDigestTab", String(result.tab));
+                if (result.action) {
+                    localStorage.setItem("pendingDigestAction", result.action);
+                }
+            }
+        }
+    } catch (e) {}
+}, false);
+
 document.addEventListener('focusin', function (e) {
   if(!e.target.matches('[data-date="start"]')) return;
 
