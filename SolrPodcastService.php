@@ -1069,8 +1069,32 @@ class SolrPodcastService extends Solr {
         
         if($payload["debug"] > 0):
             //echo "<pre>"; print_r($arr);die;
-        endif;
+        endif;        
         
+        
+        if($payload["build_mode"] == 1 && !empty($payload["boost_terms"])) {
+            $boost_ranked_search_in_arr = ["title", "desc", "host", "location", "folder_name"];
+            $boost_ranked_columns = [];
+            foreach ($search_in as $search_in_key) {
+                $search_in_key = trim($search_in_key);
+                if (in_array($search_in_key, $boost_ranked_search_in_arr)) {
+                    $boost_ranked_columns = array_merge($boost_ranked_columns, $this->query_in_column($search_in_key));
+                }
+            }
+            $boost_ranked_columns = array_values(array_unique($boost_ranked_columns));
+            $boost_base_qf = $this->build_qf_string($boost_ranked_columns, $payload["weights"] ?? []);
+            
+            if (!empty($boost_base_qf)) {
+                $boost_qf = $this->scale_qf_weights($boost_base_qf, 0.05);
+                foreach ($payload["boost_terms"] as $bterm) {
+                    $bterm = trim($bterm);
+                    if (empty($bterm)) {
+                        continue;
+                    }
+                    $groups["OR"][] = $this->build_group_clause($bterm, $boost_qf, false, false);
+                }
+            }
+        }
         
         $main_query = "";
         $group_params = [];        
