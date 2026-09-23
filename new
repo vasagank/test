@@ -1,0 +1,188 @@
+# Judged re-ranking: implementation guide
+
+MillionPodcasts search. Prepared 22 September 2026 for the dev team.
+
+This guide covers how to build what the 60-query audit tested: judge a bigger candidate pool with the v1 rubric, fill thin topics, and serve relevant shows ordered by pitchability. Everything here was measured on live `claude.php` results for 60 weak queries. The scores in the audit were hand-scored against the same rubric, so the pilot in step 8 is where you confirm the numbers with the real API judge.
+
+Files in this package:
+
+| File | What it is |
+|---|---|
+| `implementation.md` | This guide. |
+| `rerank.py` | Reference logic: tiering, pool union, AI-tab and fan-out triggers, serve order, name dedupe. No I/O. Port to PHP. |
+| `test_rerank.py` | Unit tests for `rerank.py`. They all pass. Port them with the code. |
+| `expected-60.csv` | Per-query audit numbers for all 60 queries. Use for the pilot comparison in step 8. |
+| `judging-prompt-v1.zip` | Already shared: the judging prompt, harness, and `golden-hotel-500.json`. Unchanged. |
+
+---
+
+## 1. What we are building and why
+
+| View, 60 queries (3,000 top-50 slots) | Good (7+) | Strict (7+ and tier 3) |
+|---|---|---|
+| Prod as served today | 1,515 (51%) | 1,246 (42%) |
+| Dev as served today | 1,853 (62%) | 1,217 (41%) |
+| Prod + dev pool, judged | 2,538 (85%) | 1,803 (60%) |
+| Same, tier first inside the 7+ band | 2,538 (85%) | 2,121 (71%) |
+| Plus the AI tab top 50, tier first | 2,597 (87%) | **2,217 (74%)** |
+
+Four pieces, in order of payoff:
+
+1. **Judge 200 deep and re-rank.** Solves: relevant shows that sit at rank 51 to 200 and never reach page 1.
+2. **Tier first inside the relevant block.** Solves: 318 strict slots that plain judging leaves hidden, because a 9-scored dead show outranks an 8-scored active one.
+3. **Bigger pool: prod + dev union, AI tab when short.** Solves: shows one config finds and the other misses (Porn: 19 relevant in prod's 200, 102 in dev's).
+4. **Fan-out for thin topics.** Solves: topics where no config retrieves 50 relevant shows (17 of the 60).
+
+## 2. Pipeline at a glance
+
+Offline, per topic:
+
+1. Normalise the query to a topic key.
+2. Build the candidate pool: top 200 from each live `Solr8.2` config, merged.
+3. Judge every unjudged pool member with the v1 prompt.
+4. Count relevant and strict relevant. If strict is under 50, add the AI tab top 50 and judge the new ones.
+5. If relevant or strict is still under 50, fan out on expansion terms and judge their top 50.
+6. Save everything. Nothing is served from this step directly.
+
+At serve time, per request:
+
+7. Run the live ranker as today.
+8. Look up judgments for the topic key. Append judged pool members the ranker did not return.
+9. Order with `serve_order` (section 6). Dedupe by name. Paginate.
+
+## 3. Step 1: topic key and candidate pool
+
+**Topic key.** Key everything on the expansion's normalised topic, not the raw string. `hotel`, `hotels` and `hotel industry` share almost all their results, so they should share one pool and one set of judgments.
+
+**Pool.** Fetch the top 200 feed IDs from each config and merge with `build_pool(prod_ids, dev_ids)`. Dedupe is by `feed_id`, first-seen order kept.
+
+- While prod and dev are both live, use both. The union averaged 304 shows per topic across the 60 queries.
+- Once dev replaces prod, the pool is the live config's top 200 and this step gets cheaper. Keep `build_pool` anyway, because the AI tab and fan-out results go through it too.
+
+Fields each candidate needs, all already in the `claude.php` result rows:
+
+| Field | Used for |
+|---|---|
+| `feed_id` | Key |
+| `feed_name`, `feed_desc`, `category` | Judge input (name, description cut at 500 characters, category) |
+| `entry_count`, `latest_entry_timestamp` | Tier |
+| `has_guest`, `total_review_count` | Tie-breaks |
+
+## 4. Step 2: judging
+
+Use the v1 package as it is. The settings that matter, all from the prompt spec:
+
+- **50 candidates per call, temperature 0, assistant prefill** `{"judgments":[`.
+- **Store the 0 to 10 score, never a yes/no flag.** Every threshold in this guide can then be moved without re-judging.
+- **Store `model` and `prompt_version` on every row.** When either changes, those rows are stale.
+- **Batch API with the lean output format.** About $46 per 1,000 topics at 200 pairs each on Sonnet 5 (see the costing note).
+- **Validate first.** Run the golden `hotel` set and hit the four targets before any volume: 90% agreement at 7+, mean absolute error under 1.5, false positives under 5%, 25 of 25 name-match traps scored 0.
+
+Judge only pairs not already stored. A show judged for a topic stays judged until the prompt or model changes.
+
+## 5. Step 3: tier, and steps 4 and 5: filling short topics
+
+**Tier.** Compute at serve time from the index, never store it with the judgment, because it changes every time a show publishes. The audit definition (`tier()` in `rerank.py`):
+
+| Tier | Rule |
+|---|---|
+| 3 (strict) | last episode within 6 months and 20+ episodes |
+| 2 | within 12 months and 10+ episodes |
+| 1 | within 12 months and 3+ episodes |
+| 0 | anything else, including no timestamp |
+
+Months = days since `latest_entry_timestamp` divided by 30.4375.
+
+**AI tab (Solr 9.8).** After judging the pool, call `needs_more()`. If strict relevant is under 50, take the top 50 from the `Solr9.8` block, merge, and judge only the new ones.
+
+- Why conditional: across 60 queries the AI tab added 2,020 shows to judge for 59 good and 96 strict slots. Almost all the gain was on queries short on strict shows. On full queries it adds cost and nothing else.
+- Known issues to leave for the search team, not this pipeline: tai chi returns Chinese-language wellness shows, and esop, open banking and life cycle management return word-part matches. The judge scores those low, so they are harmless here, just wasted calls.
+
+**Fan-out.** If relevant or strict relevant is still under 50, call `fanout_terms(expansion, query)`. It returns expansion terms weighted 0.8 or more, minus the query and its single words. Run each as its own query, take the top 50, merge, and judge the new ones. Tested on `music film`: 8 good shows before, 41 after.
+
+Topics that are still short after fan-out are honestly thin. Serve the short relevant block and let the rest follow. Do not pad.
+
+## 6. Serving order
+
+`serve_order(ranker_ids, scores, meta)` returns three blocks. Nothing is ever dropped.
+
+1. **Judged relevant (score 7+).** Sorted by tier, then score, then `has_guest`, then reviews. Remaining ties keep ranker order.
+2. **Not judged yet**, in ranker order. A new show must never fall below shows the judge has already rejected. Queue it for judging.
+3. **Judged below 7**, by score, then ranker order.
+
+Rules around it:
+
+- **Input list.** The live ranker's results, then any judged pool members it did not return (they came from the other config, the AI tab or fan-out). Without this, the pool work never reaches the page.
+- **Unjudged topic.** Serve ranker order exactly as today.
+- **Never block a request on judging.** Judging is offline only.
+- **Dedupe by normalised feed name** after ordering (`dedupe_by_name`). Some shows exist as several feeds.
+- **Filters and sorts.** When the user picks an explicit sort (reviews, newest), honour it and skip this ordering. When they filter, apply the filter first, then order what is left.
+
+Keep `tier_first` as a flag. The audit's "judged, score first" view is `tier_first=False`, which is useful for A/B comparison.
+
+## 7. Data model
+
+**`judgment`**, one row per topic and show:
+
+| Column | Type | Notes |
+|---|---|---|
+| `topic_key` | varchar | Normalised topic |
+| `feed_id` | int | |
+| `score` | tinyint | 0 to 10 |
+| `reason` | varchar | Reason code from the v1 output |
+| `note` | varchar, null | Only for scores 3 to 6 |
+| `low_information`, `ambiguous` | bool | From the v1 output |
+| `source` | enum | `prod`, `dev`, `ai`, `fanout` |
+| `fanout_term` | varchar, null | When `source = fanout` |
+| `model`, `prompt_version` | varchar | For staleness |
+| `judged_at` | datetime | |
+
+Primary key `(topic_key, feed_id)`. Index on `topic_key`.
+
+**`topic_state`**, one row per topic:
+
+| Column | Notes |
+|---|---|
+| `topic_key` | Primary key |
+| `pool_size`, `relevant`, `strict_relevant` | Recomputed after each judging pass |
+| `ai_added`, `fanout_done` | Bools, so the triggers run once |
+| `ambiguous_share` | Share of the pool flagged ambiguous. Over half means the query needs the P0d treatment |
+| `last_judged_at` | |
+
+Cache the per-topic score map in memory or Redis at serve time. At about 300 to 400 rows per topic, it is small.
+
+## 8. Rollout
+
+1. ◻ **Golden check.** Run `golden-hotel-500.json` against the chosen model and prompt. Hit all four targets. Solves: catching a miscalibrated judge before it touches volume.
+2. ◻ **Pilot on these 60 queries.** Run steps 1 to 5 on the 60 topics in `expected-60.csv`, serve nothing, and compare. Expect totals within about 5% of the audit figures in section 1, and look closely at any single query that differs by more than 10 slots. Solves: confirming the API judge reproduces the hand audit before you trust it on new topics.
+3. ◻ **Held-out set.** Pick about 100 queries that never get judged ordering, spanning wins, losses and controls. Report the scorecard on that set for every future ranker change. Solves: keeping ranker changes measurable once judged ordering hides them.
+4. ◻ **Head topics, behind a flag.** Turn on judged ordering for the top 1,000 topics by volume. A/B against ranker order on click-through, results opened, and contact reveals. Solves: proving the lift on real users before widening.
+5. ◻ **Widen and keep fresh.** Extend by volume. A nightly pass judges new shows entering any judged topic's pool. A full re-judge happens only when the prompt or model changes.
+
+## 9. Cost
+
+Per 1,000 topics on Sonnet 5, Batch API, lean output. Scaled from the 20,000-topic costing ($46 per 1,000 topics at 200 pairs each):
+
+| Pool | Pairs per topic | Cost per 1,000 topics |
+|---|---|---|
+| Live config top 200 only | 200 | about $46 |
+| Prod + dev union | about 304 | about $70 |
+| Union, plus AI tab and fan-out where triggered | about 380 | about $87 |
+
+The last row assumes the triggers fire as often as they did in the audit. That is high, because the audit picked weak queries on purpose, so treat it as a ceiling. After dev replaces prod, the union row goes away.
+
+## 10. Decisions still open
+
+These do not block the build. Each is a config value, not code.
+
+- ◻ **Count tier 2 as strict for thin topics.** 13 of the 60 queries have 50+ relevant shows but under 50 strict ones (for example Graphic Design with 27, family office with 23, Stablecoin with 14). Solves: relevant shows skipped only because they are under 20 episodes or between seasons.
+- ◻ **Episode floor for tier 3: 20 or 10.** The earlier pitchability review found the verdict holds either way. 10 stops penalising new weekly shows.
+- ◻ **Use `has_guest` in the tier, not only as a tie-break.** It is accurate and unused. Solves: ranking shows that actually book guests above solo shows, which is what PR users need.
+
+## 11. Definition of done
+
+- ◻ `rerank.py` logic ported, with the unit tests passing in the target language.
+- ◻ Golden `hotel` check passes on the chosen model, and the result is stored.
+- ◻ Pilot totals on the 60 queries within 5% of section 1.
+- ◻ Held-out set defined and reported.
+- ◻ Flag, A/B, and fallback to ranker order verified. That means unjudged topics, unjudged shows, and explicit user sorts.
